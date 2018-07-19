@@ -1,0 +1,51 @@
+namespace VRTK
+{
+    using System.Collections;
+    using System.Collections.Generic;
+    using UnityEngine;
+    using UnityEngine.UI;
+
+    public class ClothUtensilCounter : MonoBehaviour
+    {
+        public Text counter, counter2, counter3;
+        public int Value1, Value2, Value3;
+        public GameObject Slot1, Slot2, Slot3;
+
+        void Update()
+        {
+            Value1 = Slot1.GetComponent<SnapDropZoneOverride>().thisStack.Count;
+            Value2 = Slot2.GetComponent<SnapDropZoneOverride>().thisStack.Count;
+            Value3 = Slot3.GetComponent<SnapDropZoneOverride>().thisStack.Count;
+
+            if (Value1 > 0)
+            {
+                counter.gameObject.SetActive(true);
+                counter.text = Value1.ToString();
+            }
+            else
+            {
+                counter.gameObject.SetActive(false);
+            }
+
+            if (Value2 > 0)
+            {
+                counter2.gameObject.SetActive(true);
+                counter2.text = Value2.ToString();
+            }
+            else
+            {
+                counter2.gameObject.SetActive(false);
+            }
+
+            if (Value3 > 0)
+            {
+                counter3.gameObject.SetActive(true);
+                counter3.text = Value3.ToString();
+            }
+            else
+            {
+                counter3.gameObject.SetActive(false);
+            }
+        }
+    }
+}
