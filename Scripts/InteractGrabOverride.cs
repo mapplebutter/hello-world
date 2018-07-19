@@ -1,0 +1,166 @@
+﻿namespace VRTK
+{
+    using System.Collections;
+    using System.Collections.Generic;
+    using UnityEngine;
+
+    [System.Serializable]
+    public class InteractGrabOverride : VRTK_InteractGrab
+    {
+        protected Collider[] hitCollidersLeft;
+        protected Collider[] hitCollidersRight;
+        protected Collider[] penaltyCheck;
+        public static GameObject firstGrabber = null;
+        public static GameObject secondGrabber = null;
+        bool alreadyChecked = false;
+
+
+        public override void AttemptGrabObject()
+        {
+            //Finds position of both controllers, check if any of them in the sphere collider, if so cannot grab. 
+
+            GameObject objectToGrab = GetGrabbableObject();
+            if (firstGrabber != null && objectToGrab.layer == (int)ObjectLayer.Heavy)
+            {
+                firstGrabber = objectToGrab.GetComponent<VRTK_InteractableObject>().GetGrabbingObject();
+                if (VRTK_DeviceFinder.GetControllerHand(firstGrabber) == SDK_BaseController.ControllerHand.Left)
+                {
+                    secondGrabber = VRTK_DeviceFinder.DeviceTransform(VRTK_DeviceFinder.Devices.RightController).gameObject;
+                }
+                else
+                {
+                    secondGrabber = VRTK_DeviceFinder.DeviceTransform(VRTK_DeviceFinder.Devices.LeftController).gameObject;
+                }
+            }
+            GameObject leftCtrler = VRTK_DeviceFinder.DeviceTransform(VRTK_DeviceFinder.Devices.LeftController).gameObject;
+            GameObject rightCtrler = VRTK_DeviceFinder.DeviceTransform(VRTK_DeviceFinder.Devices.RightController).gameObject;
+
+
+            hitCollidersLeft = Physics.OverlapSphere(leftCtrler.transform.position, 0.04f);
+            hitCollidersRight = Physics.OverlapSphere(rightCtrler.transform.position, 0.04f);
+
+            penaltyCheck = Physics.OverlapBox(this.transform.position, new Vector3(0.1f, 0.1f, 0.1f), Quaternion.identity);
+            bool ungrabbable = false;
+
+
+            foreach (Collider c in penaltyCheck)
+            {
+                if (c.gameObject.tag == "Penalty")
+                {
+                    ScoreCheck.instance.Deductscore(1);
+                }
+            }
+
+            foreach (Collider col in hitCollidersLeft)
+            {
+                if (col.gameObject.layer == (int)ObjectLayer.Ungrabbable || col.gameObject.layer == (int)ObjectLayer.Tray)
+                {
+                    ungrabbable = true;
+                }
+            }
+
+            foreach (Collider col in hitCollidersRight)
+            {
+                if (col.gameObject.layer == (int)ObjectLayer.Ungrabbable || col.gameObject.layer == (int)ObjectLayer.Tray)
+                {
+                    ungrabbable = true;
+                }
+            }
+
+            //
+            GameObject proceduralSnapGameObject = objectToGrab;
+            bool beneathStack = false;
+
+            //handle grabbing of object in the stack
+            if (proceduralSnapGameObject != null)
+            {
+                while (proceduralSnapGameObject.GetComponent<VRTK_InteractableObject>().GetStoredSnapDropZone() != null)
+                {
+                    proceduralSnapGameObject = proceduralSnapGameObject.GetComponent<VRTK_InteractableObject>().GetStoredSnapDropZone().
+                        gameObject.transform.parent.gameObject;
+                }
+
+                if (proceduralSnapGameObject.GetComponent<ProceduralSnap>())
+                {
+                    ProceduralSnap PS = proceduralSnapGameObject.GetComponent<ProceduralSnap>();
+                    for (int i = 0; i < PS.snapZones.Length; i++)
+                    {
+                        if (PS.snapZones[i].GetCurrentSnappedObject() == objectToGrab)
+                        {
+                            if (PS.snapZones[i].proceduralSnapPos <= PS.snapCount - 1)
+                            {
+                                beneathStack = true;
+                            }
+
+                            if(PS.snapZones[i].proceduralSnapPos == 7) //check if its 2nd highest in the stack due to bypassing snapcount for 8th and 7th sideplate
+                            {
+                               if(PS.snapZones[i].proceduralSnapPos < PS.snapCount)
+                                {
+                                    beneathStack = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            //
+
+
+            //Using this for normal grab and to check which controller grab first so
+            //the second grab will work better
+            if (objectToGrab != null)
+            {
+                if (objectToGrab.layer == (int)ObjectLayer.Ungrabbable && !ungrabbable || objectToGrab.layer == (int)ObjectLayer.Tray && !ungrabbable)
+                {
+                    if(objectToGrab.tag == "Sideplate")
+                    {
+                        if (objectToGrab.GetComponent<VRTK_InteractableObject>().GetStoredSnapDropZone() == null)
+                        {
+                            PerformGrabAttempt(objectToGrab);
+                            objectToGrab.GetComponent<SphereCollider>().enabled = false;
+                        }
+                        else if(objectToGrab.GetComponent<VRTK_InteractableObject>().GetStoredSnapDropZone() != null)
+                        {
+                            if (!beneathStack)
+                            {
+                                PerformGrabAttempt(objectToGrab);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        PerformGrabAttempt(objectToGrab);
+                        objectToGrab.GetComponent<SphereCollider>().enabled = false;
+                    }
+                }
+
+                if (!beneathStack && objectToGrab.layer != (int)ObjectLayer.Ungrabbable && objectToGrab.layer != (int)ObjectLayer.Tray)
+                {
+                    PerformGrabAttempt(objectToGrab);
+                }
+            }
+
+            else
+            {
+                grabPrecognitionTimer = Time.time + grabPrecognition;
+            }
+        }
+
+
+        protected bool CheckHeavyObjectGrabbed(Collider[] overlapSphere)
+        {
+            if (overlapSphere != null)
+            {
+                foreach (Collider col in overlapSphere)
+                {
+                    if (col.gameObject.layer == (int)ObjectLayer.Heavy)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+    }
+}
